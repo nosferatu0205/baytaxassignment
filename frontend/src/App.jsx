@@ -1,8 +1,9 @@
 import React from "react";
 import { Routes, Route, Link } from "react-router-dom";
 import EntityList from "../components/EntityList";
-// Import the new component
 import PdfUpload from "../components/PdfUpload";
+// Import the mapping component
+import FieldMapping from "../components/FieldMapping";
 
 function App() {
   return (
@@ -15,9 +16,12 @@ function App() {
           <li>
             <Link to="/entities">Entities</Link>
           </li>
-          {/* Add link to the new page */}
           <li>
             <Link to="/forms">Manage Forms</Link>
+          </li>
+          {/* Add link to the mapping page */}
+          <li>
+            <Link to="/mapping">Field Mapping</Link>
           </li>
         </ul>
       </nav>
@@ -28,8 +32,9 @@ function App() {
       <Routes>
         <Route path="/" element={<h2>Home Page</h2>} />
         <Route path="/entities" element={<EntityList />} />
-        {/* Add route for the new page */}
         <Route path="/forms" element={<PdfUpload />} />
+        {/* Add route for the mapping page */}
+        <Route path="/mapping" element={<FieldMapping />} />
       </Routes>
     </div>
   );
