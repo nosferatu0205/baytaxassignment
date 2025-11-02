@@ -1,20 +1,63 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import EntityForm from "./EntityForm";
+//import "./EntityList.css";
 
 const API_URL = "http://127.0.0.1:5001/api";
 
-// This is a new component for the generation logic
+// Enhanced component for the generation logic
 function EntityPdfGenerator({ entity, formList }) {
   const [selectedFormId, setSelectedFormId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mappingStatus, setMappingStatus] = useState(null);
+
+  // Check if the selected form has mappings
+  useEffect(() => {
+    const checkFormMappings = async () => {
+      if (!selectedFormId) {
+        setMappingStatus(null);
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${API_URL}/mappings/form/${selectedFormId}`
+        );
+
+        if (response.data.length === 0) {
+          setMappingStatus({
+            hasMappings: false,
+            message: "This form doesn't have any field mappings configured.",
+          });
+        } else {
+          setMappingStatus({
+            hasMappings: true,
+            count: response.data.length,
+            message: `This form has ${response.data.length} field mappings configured.`,
+          });
+        }
+      } catch (err) {
+        console.error("Error checking form mappings:", err);
+        setMappingStatus({
+          hasMappings: false,
+          message: "Could not verify form mappings.",
+        });
+      }
+    };
+
+    if (selectedFormId) {
+      checkFormMappings();
+    }
+  }, [selectedFormId]);
 
   const handleGenerate = async () => {
     if (!selectedFormId) {
       setError("Please select a form to generate.");
       return;
     }
+
+    // Clear any previous errors
     setError("");
     setLoading(true);
 
@@ -57,16 +100,27 @@ function EntityPdfGenerator({ entity, formList }) {
       URL.revokeObjectURL(fileURL);
     } catch (err) {
       console.error("Error generating PDF:", err);
-      // Need to handle blob error response
-      if (err.response && err.response.data.type === "application/json") {
-        const reader = new FileReader();
-        reader.onload = function () {
-          const errorData = JSON.parse(this.result);
-          setError(errorData.error || "Failed to generate PDF.");
-        };
-        reader.readAsText(err.response.data);
+      // Handle error response
+      if (err.response) {
+        if (err.response.data instanceof Blob) {
+          // Try to read blob error as JSON
+          const reader = new FileReader();
+          reader.onload = function () {
+            try {
+              const errorData = JSON.parse(this.result);
+              setError(errorData.error || "Failed to generate PDF.");
+            } catch (e) {
+              setError("Failed to generate PDF. Unknown error format.", e);
+            }
+          };
+          reader.readAsText(err.response.data);
+        } else {
+          setError(err.response.data?.error || "Failed to generate PDF.");
+        }
       } else {
-        setError("Failed to generate PDF. Check mappings.");
+        setError(
+          "Failed to generate PDF. Check mappings or network connection."
+        );
       }
     } finally {
       setLoading(false);
@@ -74,44 +128,71 @@ function EntityPdfGenerator({ entity, formList }) {
   };
 
   if (formList.length === 0) {
-    return <small>No forms uploaded. Go to "Manage Forms" to add one.</small>;
+    return (
+      <div className="form-notice">
+        No forms uploaded. Go to "Manage Forms" to add one.
+      </div>
+    );
   }
 
   return (
-    <div style={{ marginLeft: "10px", display: "inline-block" }}>
-      <select
-        value={selectedFormId}
-        onChange={(e) => setSelectedFormId(e.target.value)}
-      >
-        <option value="">-- Select Form --</option>
-        {formList.map((form) => (
-          <option key={form.id} value={form.id}>
-            {form.form_name}
-          </option>
-        ))}
-      </select>
-      <button
-        onClick={handleGenerate}
-        disabled={loading}
-        style={{ marginLeft: "5px" }}
-      >
-        {loading ? "Generating..." : "Generate PDF"}
-      </button>
-      {error && (
-        <small style={{ color: "red", display: "block" }}>{error}</small>
+    <div className="pdf-generator">
+      <div className="form-selector">
+        <select
+          value={selectedFormId}
+          onChange={(e) => {
+            setSelectedFormId(e.target.value);
+            setError("");
+          }}
+          className="form-select"
+          disabled={loading}
+        >
+          <option value="">-- Select Form --</option>
+          {formList.map((form) => (
+            <option key={form.id} value={form.id}>
+              {form.form_name}
+            </option>
+          ))}
+        </select>
+
+        <button
+          onClick={handleGenerate}
+          disabled={loading || !selectedFormId}
+          className="generate-button"
+        >
+          {loading ? "Generating..." : "Generate PDF"}
+        </button>
+      </div>
+
+      {mappingStatus && (
+        <div
+          className={`mapping-status ${
+            mappingStatus.hasMappings ? "has-mappings" : "no-mappings"
+          }`}
+        >
+          {mappingStatus.message}
+          {!mappingStatus.hasMappings && (
+            <a href="/mapping" className="setup-link">
+              Set up mappings
+            </a>
+          )}
+        </div>
       )}
+
+      {error && <div className="error-message">{error}</div>}
     </div>
   );
 }
 
 function EntityList() {
   const [entities, setEntities] = useState([]);
-  const [formList, setFormList] = useState([]); // <-- Add state for forms
+  const [formList, setFormList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchEntities = async () => {
     try {
+      setLoading(true);
       const [entitiesRes, formsRes] = await Promise.all([
         axios.get(`${API_URL}/entities`),
         axios.get(`${API_URL}/forms`),
@@ -119,26 +200,26 @@ function EntityList() {
 
       setEntities(entitiesRes.data);
       setFormList(formsRes.data);
+      setError(null);
     } catch (err) {
       console.error("Error:", err);
-      setError("failed loading entities or forms");
+      setError("Failed loading entities or forms");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (idToDelete) => {
-    if (!window.confirm("Sure to delete?")) {
+    if (!window.confirm("Are you sure you want to delete this entity?")) {
       return;
     }
     try {
       await axios.delete(`${API_URL}/entities/${idToDelete}`);
-      // Refetch entities, no need to refetch forms
-      const response = await axios.get(`${API_URL}/entities`);
-      setEntities(response.data);
+      // Refresh entities list
+      setEntities(entities.filter((entity) => entity.id !== idToDelete));
     } catch (e) {
       console.error("Error: ", e);
-      setError("Failed deletion.");
+      setError("Failed to delete entity.");
     }
   };
 
@@ -146,39 +227,62 @@ function EntityList() {
     fetchEntities();
   }, []);
 
-  if (loading) {
-    return <h1>Loading</h1>;
+  if (loading && entities.length === 0) {
+    return <div className="loading">Loading...</div>;
   }
 
   if (error) {
-    return <>{error}</>;
+    return <div className="error-message">{error}</div>;
   }
 
   return (
-    <div>
+    <div className="entity-management">
       <h2>Entity Management</h2>
-      <ul>
+
+      <div className="entity-list">
         {entities.length === 0 ? (
-          <li>No entities found</li>
+          <div className="no-entities">No entities found. Add one below.</div>
         ) : (
-          entities.map((entity) => (
-            <li key={entity.id} style={{ marginBottom: "15px" }}>
-              <strong>{entity.name}</strong> - {entity.city}, {entity.state}
-              <button
-                onClick={() => handleDelete(entity.id)}
-                style={{ marginLeft: "10px" }}
-              >
-                Delete
-              </button>
-              {/* --- ADDED GENERATOR COMPONENT --- */}
-              <EntityPdfGenerator entity={entity} formList={formList} />
-            </li>
-          ))
+          <ul>
+            {entities.map((entity) => (
+              <li key={entity.id} className="entity-item">
+                <div className="entity-info">
+                  <h3>{entity.name}</h3>
+                  <div className="entity-address">
+                    {entity.street_address && (
+                      <div>{entity.street_address}</div>
+                    )}
+                    {(entity.city || entity.state || entity.zip_code) && (
+                      <div>
+                        {entity.city && <span>{entity.city}</span>}
+                        {entity.state && <span>, {entity.state}</span>}
+                        {entity.zip_code && <span> {entity.zip_code}</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="entity-actions">
+                  <button
+                    onClick={() => handleDelete(entity.id)}
+                    className="delete-button"
+                  >
+                    Delete
+                  </button>
+
+                  <EntityPdfGenerator entity={entity} formList={formList} />
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
-      </ul>
+      </div>
 
       <hr />
-      <EntityForm onEntityAdded={fetchEntities} />
+
+      <div className="entity-form-section">
+        <EntityForm onEntityAdded={fetchEntities} />
+      </div>
     </div>
   );
 }
