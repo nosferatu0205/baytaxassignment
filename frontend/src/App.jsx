@@ -1,6 +1,6 @@
-import React from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
-import EntityList from '../components/EntityList'; 
+import React from "react";
+import { Routes, Route, Link } from "react-router-dom";
+import EntityList from "../components/EntityList";
 
 function App() {
   return (
