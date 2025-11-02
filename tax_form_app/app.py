@@ -62,6 +62,16 @@ class PdfForm(db.Model):
     # Storing file data as 'LargeBinary' (BLOB)
     file_data = db.Column(db.LargeBinary, nullable=False)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Add a to_dict method for API responses
+    def to_dict(self):
+        """Serializes the object to a dictionary (without file_data)."""
+        return {
+            'id': self.id,
+            'form_name': self.form_name,
+            'uploaded_at': self.uploaded_at.isoformat()
+        }
+
 
 class FieldMapping(db.Model):
     """
@@ -157,6 +167,51 @@ def delete_entity(id):
     db.session.commit()
 
     return jsonify({'message': 'Entity deleted successfully'}), 200
+
+# --- API Endpoints for PDF Forms ---
+
+@app.route('/api/forms/upload', methods=['POST'])
+def upload_form():
+    """Uploads a new PDF form template."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['file']
+    form_name = request.form.get('form_name')
+
+    if not form_name:
+        return jsonify({'error': 'Form name is required'}), 400
+        
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    if file and file.filename.endswith('.pdf'):
+        # Check if form name already exists
+        existing_form = PdfForm.query.filter_by(form_name=form_name).first()
+        if existing_form:
+            return jsonify({'error': 'A form with this name already exists'}), 409 # 409 Conflict
+
+        file_data = file.read() # Read binary data
+        
+        new_form = PdfForm(
+            form_name=form_name,
+            file_data=file_data
+        )
+        
+        db.session.add(new_form)
+        db.session.commit()
+        
+        return jsonify(new_form.to_dict()), 201
+    else:
+        return jsonify({'error': 'Invalid file type, only PDF allowed'}), 400
+
+@app.route('/api/forms', methods=['GET'])
+def get_all_forms():
+    """Gets all uploaded PDF forms (metadata only)."""
+    forms = PdfForm.query.order_by(PdfForm.form_name).all()
+    # Use the to_dict() method to avoid sending large file_data
+    return jsonify([form.to_dict() for form in forms]), 200
+
 
 # --- Main Execution ---
 if __name__ == '__main__':
