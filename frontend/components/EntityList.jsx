@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import axios from 'axios';
+import EntityForm from './EntityForm';
 
 
 const API_URL = 'http://127.0.0.1:5001/api';
@@ -53,6 +54,9 @@ function EntityList() {
                 )
                 }
         </ul>
+
+        <hr/>
+        <EntityForm/>
     </div>
   );
 }
