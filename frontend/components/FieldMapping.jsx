@@ -121,43 +121,74 @@ function FieldMapping() {
 
   // 6. Auto-map fields based on name similarity
   const autoMapFields = () => {
+    // Define more robust matching rules, ordered by specificity
+    const ENTITY_FIELD_RULES = {
+      name: [/full_name/i, /entity_name/i, /^name$/i, /name/i],
+      street_address: [
+        /street_address/i,
+        /address_line_1/i,
+        /^street$/i,
+        /^address$/i,
+        /addr/i,
+        /address/i,
+      ],
+      city: [/^city$/i, /city/i],
+      state: [/^state$/i, /state_province/i, /state/i],
+      zip_code: [/zip_code/i, /postal_code/i, /^zip$/i, /zip/i],
+    };
+
+    // Get a list of entity field keys: ['name', 'street_address', 'city', 'state', 'zip_code']
+    const entityFieldKeys = ENTITY_FIELDS.map((f) => f.id);
+
     const newMappings = { ...mappings };
+    let fieldsMapped = 0;
 
     pdfFields.forEach((field) => {
+      // Check if this field is already mapped. If so, skip it.
+      // This preserves any manual mappings the user has already set.
+      if (newMappings[field.name]) {
+        return;
+      }
+
       const fieldName = field.name.toLowerCase();
       const alternateName = field.alternate_name
         ? field.alternate_name.toLowerCase()
         : "";
 
-      // Try to match field names with entity fields
-      ENTITY_FIELDS.forEach((entityField) => {
-        const entityFieldId = entityField.id;
-        const entityFieldLabel = entityField.label.toLowerCase();
+      // Combine name and tooltip for a better match context
+      const fullTextToSearch = `${fieldName} ${alternateName}`;
 
-        // Check if field name contains entity field name
-        if (
-          fieldName.includes(entityFieldId) ||
-          fieldName.includes(entityFieldLabel) ||
-          alternateName.includes(entityFieldId) ||
-          alternateName.includes(entityFieldLabel)
-        ) {
-          newMappings[field.name] = entityFieldId;
-        }
+      let matchFound = false;
 
-        // Special case for address fields
-        if (
-          entityFieldId === "street_address" &&
-          (fieldName.includes("address") || alternateName.includes("address"))
-        ) {
-          newMappings[field.name] = "street_address";
+      // Iterate through the entity fields in order
+      for (const entityFieldId of entityFieldKeys) {
+        if (matchFound) break;
+
+        // Get the rules for this specific entity field
+        const rules = ENTITY_FIELD_RULES[entityFieldId] || [];
+
+        for (const rule of rules) {
+          if (rule.test(fullTextToSearch)) {
+            newMappings[field.name] = entityFieldId;
+            fieldsMapped++;
+            matchFound = true;
+            break; // Stop checking rules for this field, move to next field
+          }
         }
-      });
+      }
     });
 
     setMappings(newMappings);
-    setMessage("Auto-mapping applied. Please review and save your changes.");
+    if (fieldsMapped > 0) {
+      setMessage(
+        `Auto-mapped ${fieldsMapped} new field(s). Please review and save your changes.`
+      );
+    } else {
+      setMessage(
+        "No new auto-mappings found. All fields may be mapped or no strong matches were detected."
+      );
+    }
   };
-
   // 7. Clear all mappings
   const clearAllMappings = () => {
     setMappings({});

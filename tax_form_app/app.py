@@ -337,6 +337,7 @@ def create_or_update_mappings():
         return jsonify({'error': f'Failed to save mappings: {str(e)}'}), 500
 
 # --- Enhanced PDF Generation Endpoint ---
+# --- Enhanced PDF Generation Endpoint ---
 @app.route('/api/generate-pdf', methods=['POST'])
 def generate_pdf():
     """
@@ -375,11 +376,18 @@ def generate_pdf():
         if not fields:
             return jsonify({'error': 'The PDF does not contain any fillable form fields'}), 400
         
+        # --- START OF FIX ---
+        
         writer = PdfWriter()
         
-        # Copy all pages from reader to writer
-        for page in reader.pages:
-            writer.add_page(page)
+        # Clone the entire document from the reader, including form fields
+        writer.clone_document_from_reader(reader)
+        writer.set_need_appearances_writer(True)
+        # The manual page-copying loop below is no longer needed and should be removed.
+        # for page in reader.pages:
+        #     writer.add_page(page)
+
+        # --- END OF FIX ---
         
         # Prepare the field data dictionary
         fill_data = {}
@@ -410,6 +418,7 @@ def generate_pdf():
         
         # Apply the field values - PyPDF library will handle this
         if fill_data:
+            # The writer now has the AcroForm, so this will work
             writer.update_page_form_field_values(writer.pages[0], fill_data)
             
             # For multi-page forms, try to apply to all pages
@@ -438,7 +447,7 @@ def generate_pdf():
     except Exception as e:
         logger.error(f"Error generating PDF: {e}", exc_info=True)
         return jsonify({'error': f'Failed to generate PDF: {str(e)}'}), 500
-
+    
 # --- Debugging endpoints for troubleshooting ---
 @app.route('/api/debug/form/<int:id>', methods=['GET'])
 def debug_form_fields(id):
