@@ -110,10 +110,8 @@ function PdfUpload() {
     setMessage("");
 
     try {
-      // --- THIS IS THE UPDATED PART ---
-      // We are now calling the real backend endpoint
+      //delete
       await axios.delete(`${API_URL}/forms/${formId}`);
-      // --- END OF UPDATE ---
 
       setMessage(`Form '${formName}' deleted successfully.`);
       // Refresh the form list from the server
