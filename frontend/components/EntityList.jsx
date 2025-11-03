@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import EntityForm from "./EntityForm";
-//import "./EntityList.css";
+// We are not using this CSS file, we are using the global index.css
+// import "./EntityList.css";
 
 const API_URL = "http://127.0.0.1:5001/api";
 
@@ -20,6 +21,10 @@ function EntityPdfGenerator({ entity, formList }) {
         return;
       }
 
+      setLoading(true);
+      setError("");
+      setMappingStatus(null);
+
       try {
         const response = await axios.get(
           `${API_URL}/mappings/form/${selectedFormId}`
@@ -28,13 +33,13 @@ function EntityPdfGenerator({ entity, formList }) {
         if (response.data.length === 0) {
           setMappingStatus({
             hasMappings: false,
-            message: "This form doesn't have any field mappings configured.",
+            message: "This form has no mappings.",
           });
         } else {
           setMappingStatus({
             hasMappings: true,
             count: response.data.length,
-            message: `This form has ${response.data.length} field mappings configured.`,
+            message: `This form has ${response.data.length} field mappings.`,
           });
         }
       } catch (err) {
@@ -43,6 +48,8 @@ function EntityPdfGenerator({ entity, formList }) {
           hasMappings: false,
           message: "Could not verify form mappings.",
         });
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -144,7 +151,6 @@ function EntityPdfGenerator({ entity, formList }) {
             setSelectedFormId(e.target.value);
             setError("");
           }}
-          className="form-select"
           disabled={loading}
         >
           <option value="">-- Select Form --</option>
@@ -158,9 +164,9 @@ function EntityPdfGenerator({ entity, formList }) {
         <button
           onClick={handleGenerate}
           disabled={loading || !selectedFormId}
-          className="generate-button"
+          className="button"
         >
-          {loading ? "Generating..." : "Generate PDF"}
+          {loading ? "..." : "Generate"}
         </button>
       </div>
 
@@ -179,7 +185,7 @@ function EntityPdfGenerator({ entity, formList }) {
         </div>
       )}
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="message-error mt-4">{error}</div>}
     </div>
   );
 }
@@ -228,23 +234,24 @@ function EntityList() {
   }, []);
 
   if (loading && entities.length === 0) {
-    return <div className="loading">Loading...</div>;
+    return <p>Loading...</p>;
   }
 
   if (error) {
-    return <div className="error-message">{error}</div>;
+    return <div className="message-error">{error}</div>;
   }
 
   return (
-    <div className="entity-management">
-      <h2>Entity Management</h2>
+    <div>
+      <h2 className="home-title">Entity Management</h2>
 
-      <div className="entity-list">
-        {entities.length === 0 ? (
-          <div className="no-entities">No entities found. Add one below.</div>
-        ) : (
-          <ul>
-            {entities.map((entity) => (
+      <div className="page-section">
+        <h3>All Entities</h3>
+        <div className="entity-list">
+          {entities.length === 0 ? (
+            <p>No entities found. Add one below.</p>
+          ) : (
+            entities.map((entity) => (
               <li key={entity.id} className="entity-item">
                 <div className="entity-info">
                   <h3>{entity.name}</h3>
@@ -263,26 +270,23 @@ function EntityList() {
                 </div>
 
                 <div className="entity-actions">
+                  <EntityPdfGenerator entity={entity} formList={formList} />
                   <button
                     onClick={() => handleDelete(entity.id)}
-                    className="delete-button"
+                    className="button button-delete"
                   >
-                    Delete
+                    Delete Entity
                   </button>
-
-                  <EntityPdfGenerator entity={entity} formList={formList} />
                 </div>
               </li>
-            ))}
-          </ul>
-        )}
+            ))
+          )}
+        </div>
       </div>
 
       <hr />
 
-      <div className="entity-form-section">
-        <EntityForm onEntityAdded={fetchEntities} />
-      </div>
+      <EntityForm onEntityAdded={fetchEntities} />
     </div>
   );
 }

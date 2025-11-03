@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-//import "./FieldMapping.css";
+// We are not using this CSS file, we are using the global index.css
+// import "./FieldMapping.css";
 
 const API_URL = "http://127.0.0.1:5001/api";
 
@@ -119,9 +120,8 @@ function FieldMapping() {
     );
   });
 
-  // 6. Auto-map fields based on name similarity
+  // 6. Auto-map fields
   const autoMapFields = () => {
-    // Define more robust matching rules, ordered by specificity
     const ENTITY_FIELD_RULES = {
       name: [/full_name/i, /entity_name/i, /^name$/i, /name/i],
       street_address: [
@@ -137,42 +137,30 @@ function FieldMapping() {
       zip_code: [/zip_code/i, /postal_code/i, /^zip$/i, /zip/i],
     };
 
-    // Get a list of entity field keys: ['name', 'street_address', 'city', 'state', 'zip_code']
     const entityFieldKeys = ENTITY_FIELDS.map((f) => f.id);
-
     const newMappings = { ...mappings };
     let fieldsMapped = 0;
 
     pdfFields.forEach((field) => {
-      // Check if this field is already mapped. If so, skip it.
-      // This preserves any manual mappings the user has already set.
       if (newMappings[field.name]) {
         return;
       }
-
       const fieldName = field.name.toLowerCase();
       const alternateName = field.alternate_name
         ? field.alternate_name.toLowerCase()
         : "";
-
-      // Combine name and tooltip for a better match context
       const fullTextToSearch = `${fieldName} ${alternateName}`;
-
       let matchFound = false;
 
-      // Iterate through the entity fields in order
       for (const entityFieldId of entityFieldKeys) {
         if (matchFound) break;
-
-        // Get the rules for this specific entity field
         const rules = ENTITY_FIELD_RULES[entityFieldId] || [];
-
         for (const rule of rules) {
           if (rule.test(fullTextToSearch)) {
             newMappings[field.name] = entityFieldId;
             fieldsMapped++;
             matchFound = true;
-            break; // Stop checking rules for this field, move to next field
+            break;
           }
         }
       }
@@ -181,18 +169,17 @@ function FieldMapping() {
     setMappings(newMappings);
     if (fieldsMapped > 0) {
       setMessage(
-        `Auto-mapped ${fieldsMapped} new field(s). Please review and save your changes.`
+        `Auto-mapped ${fieldsMapped} new field(s). Please review and save.`
       );
     } else {
-      setMessage(
-        "No new auto-mappings found. All fields may be mapped or no strong matches were detected."
-      );
+      setMessage("No new auto-mappings found.");
     }
   };
+
   // 7. Clear all mappings
   const clearAllMappings = () => {
     setMappings({});
-    setMessage("All mappings cleared. Don't forget to save your changes.");
+    setMessage("All mappings cleared. Don't forget to save.");
   };
 
   // 8. Test mappings with an entity
@@ -204,9 +191,7 @@ function FieldMapping() {
     setError("");
 
     try {
-      // First, get all entities
       const entitiesResponse = await axios.get(`${API_URL}/entities`);
-
       if (entitiesResponse.data.length === 0) {
         setError(
           "No entities available for testing. Please create an entity first."
@@ -215,16 +200,13 @@ function FieldMapping() {
         return;
       }
 
-      // Use the first entity for testing
       const testEntityId = entitiesResponse.data[0].id;
 
-      // Call the debug endpoint to test mappings
       const testResponse = await axios.post(`${API_URL}/debug/test-mapping`, {
         entity_id: testEntityId,
         form_id: parseInt(selectedFormId),
       });
 
-      // Show the test results
       setMessage(
         `Test successful with entity "${testResponse.data.entity.name}". ${testResponse.data.mapping_count} field mappings would be applied.`
       );
@@ -237,67 +219,86 @@ function FieldMapping() {
   };
 
   return (
-    <div className="field-mapping-container">
-      <h2>Field Mapping</h2>
-      <p>Select a form to map its fields to your entity data.</p>
+    <div>
+      <h2 className="home-title">Field Mapping</h2>
+      <p className="text-gray-500" style={{ marginBottom: "1.5rem" }}>
+        Select a form to map its fields to your entity data.
+      </p>
 
-      <div className="form-selection">
-        <select
-          onChange={(e) => handleFormSelect(e.target.value)}
-          value={selectedFormId}
-          className="form-select"
-        >
-          <option value="">-- Select a Form --</option>
-          {formList.map((form) => (
-            <option key={form.id} value={form.id}>
-              {form.form_name}
-            </option>
-          ))}
-        </select>
+      <div className="mapping-header">
+        <div className="form-group">
+          <select
+            onChange={(e) => handleFormSelect(e.target.value)}
+            value={selectedFormId}
+            className="form-input"
+          >
+            <option value="">-- Select a Form --</option>
+            {formList.map((form) => (
+              <option key={form.id} value={form.id}>
+                {form.form_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedFormId && (
+          <div className="form-group">
+            <input
+              type="text"
+              placeholder="Filter fields..."
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              className="form-input"
+            />
+          </div>
+        )}
       </div>
 
-      {error && <p className="error-message">{error}</p>}
-      {message && <p className="success-message">{message}</p>}
+      {error && <div className="message-error">{error}</div>}
+      {message && <div className="message-success">{message}</div>}
 
       {selectedFormId && (
-        <div className="mapping-section">
-          <hr />
+        <div className="page-section">
           <h3>
             Map Fields for:{" "}
-            {formList.find((f) => f.id === parseInt(selectedFormId))?.form_name}
+            <span className="font-medium">
+              {
+                formList.find((f) => f.id === parseInt(selectedFormId))
+                  ?.form_name
+              }
+            </span>
           </h3>
 
           <div className="mapping-actions">
             <button
+              onClick={handleSaveMappings}
+              disabled={loading}
+              className="button"
+            >
+              {loading ? "Saving..." : "Save Mappings"}
+            </button>
+            <button
               onClick={autoMapFields}
               disabled={loading || pdfFields.length === 0}
-              className="action-button auto-map-button"
+              className="button button-secondary"
             >
               Auto-Map Fields
             </button>
 
             <button
-              onClick={clearAllMappings}
-              disabled={loading || Object.keys(mappings).length === 0}
-              className="action-button clear-button"
-            >
-              Clear All
-            </button>
-
-            <button
               onClick={testMapping}
               disabled={loading || Object.keys(mappings).length === 0}
-              className="action-button test-button"
+              className="button button-secondary"
             >
               Test Mapping
             </button>
 
             <button
-              onClick={handleSaveMappings}
-              disabled={loading}
-              className="action-button save-button"
+              onClick={clearAllMappings}
+              disabled={loading || Object.keys(mappings).length === 0}
+              className="button button-delete"
             >
-              {loading ? "Saving..." : "Save Mappings"}
+              Clear All
             </button>
           </div>
 
@@ -305,19 +306,6 @@ function FieldMapping() {
             <p>Loading...</p>
           ) : (
             <div className="mapping-table-container">
-              <div className="search-container">
-                <input
-                  type="text"
-                  placeholder="Filter fields..."
-                  value={filterText}
-                  onChange={(e) => setFilterText(e.target.value)}
-                  className="search-input"
-                />
-                <span className="field-count">
-                  {filteredFields.length} of {pdfFields.length} fields
-                </span>
-              </div>
-
               <table className="mapping-table">
                 <thead>
                   <tr>
@@ -337,23 +325,22 @@ function FieldMapping() {
                     </tr>
                   ) : (
                     filteredFields.map((field) => (
-                      <tr key={field.name} className="field-row">
-                        <td className="field-name">
-                          <strong>{field.name}</strong>
+                      <tr key={field.name}>
+                        <td>
+                          <span className="field-name">{field.name}</span>
                           {field.type && (
                             <span className="field-type">{field.type}</span>
                           )}
                         </td>
                         <td className="field-tooltip">
-                          {field.alternate_name}
+                          {field.alternate_name || "-"}
                         </td>
-                        <td className="field-mapping">
+                        <td>
                           <select
                             value={mappings[field.name] || ""}
                             onChange={(e) =>
                               handleMappingChange(field.name, e.target.value)
                             }
-                            className="mapping-select"
                           >
                             <option value="">-- Do not fill --</option>
                             {ENTITY_FIELDS.map((entityField) => (

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-//import "./PdfUpload.css";
 
 const API_URL = "http://127.0.0.1:5001/api";
 
@@ -46,15 +45,12 @@ function PdfUpload() {
     setFile(selectedFile);
     setError("");
 
-    // If user selected a file, suggest a form name based on filename
     if (selectedFile && !formName) {
-      // Remove extension and convert to title case
       let suggestedName = selectedFile.name
         .replace(".pdf", "")
         .replace(/_/g, " ")
         .replace(/-/g, " ");
 
-      // Convert to title case (capitalize first letter of each word)
       suggestedName = suggestedName
         .split(" ")
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -86,11 +82,9 @@ function PdfUpload() {
         },
       });
       setMessage(`Form '${formName}' uploaded successfully!`);
-      // Reset form
       setFormName("");
       setFile(null);
-      e.target.reset(); // Resets the file input
-      // Refresh the list of forms
+      e.target.reset();
       fetchForms();
     } catch (err) {
       console.error("Error uploading file:", err);
@@ -116,11 +110,15 @@ function PdfUpload() {
     setMessage("");
 
     try {
+      // --- THIS IS THE UPDATED PART ---
+      // We are now calling the real backend endpoint
       await axios.delete(`${API_URL}/forms/${formId}`);
+      // --- END OF UPDATE ---
+
       setMessage(`Form '${formName}' deleted successfully.`);
-      // Refresh the form list
+      // Refresh the form list from the server
       fetchForms();
-      // Reset field display if the deleted form was selected
+
       if (selectedFormId === formId) {
         setSelectedFormId(null);
         setFormFields([]);
@@ -136,7 +134,6 @@ function PdfUpload() {
 
   const handleViewFields = async (formId) => {
     if (selectedFormId === formId && showFields) {
-      // Toggle off if already showing fields for this form
       setShowFields(false);
       return;
     }
@@ -159,55 +156,55 @@ function PdfUpload() {
   };
 
   return (
-    <div className="pdf-form-management">
-      <h2>PDF Form Management</h2>
+    <div>
+      <h2 className="home-title">PDF Form Management</h2>
 
-      <div className="form-section">
+      <div className="page-section">
         <h3>Uploaded Forms</h3>
         {loading && formList.length === 0 ? (
-          <p className="loading-text">Loading forms...</p>
+          <p>Loading forms...</p>
         ) : formList.length === 0 ? (
-          <p className="no-forms-text">No forms uploaded yet.</p>
+          <p>No forms uploaded yet.</p>
         ) : (
           <div className="form-list">
             {formList.map((form) => (
               <div key={form.id} className="form-item">
-                <div className="form-details">
-                  <h4>{form.form_name}</h4>
-                  <div className="form-meta">
-                    <span>
-                      Uploaded: {new Date(form.uploaded_at).toLocaleString()}
-                    </span>
+                <div className="form-item-header">
+                  <div>
+                    <h4>{form.form_name}</h4>
+                    <div className="form-item-meta">
+                      <span>
+                        Uploaded: {new Date(form.uploaded_at).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="form-actions">
-                  <button
-                    className="view-fields-button"
-                    onClick={() => handleViewFields(form.id)}
-                  >
-                    {selectedFormId === form.id && showFields
-                      ? "Hide Fields"
-                      : "View Fields"}
-                  </button>
-                  <button
-                    className="delete-form-button"
-                    onClick={() => handleDeleteForm(form.id, form.form_name)}
-                    disabled={loading}
-                  >
-                    Delete
-                  </button>
+                  <div className="form-actions">
+                    <button
+                      className="button button-secondary"
+                      onClick={() => handleViewFields(form.id)}
+                    >
+                      {selectedFormId === form.id && showFields
+                        ? "Hide Fields"
+                        : "View Fields"}
+                    </button>
+                    <button
+                      className="button button-delete"
+                      onClick={() => handleDeleteForm(form.id, form.form_name)}
+                      disabled={loading}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
 
                 {selectedFormId === form.id && showFields && (
-                  <div className="form-fields">
+                  <div className="fields-table-container">
                     {loading ? (
                       <p>Loading fields...</p>
                     ) : formFields.length === 0 ? (
-                      <p className="no-fields-text">
-                        No fillable fields found in this form.
-                      </p>
+                      <p>No fillable fields found in this form.</p>
                     ) : (
-                      <div className="fields-table-container">
+                      <>
                         <table className="fields-table">
                           <thead>
                             <tr>
@@ -219,7 +216,7 @@ function PdfUpload() {
                           <tbody>
                             {formFields.map((field, index) => (
                               <tr key={index}>
-                                <td>{field.name}</td>
+                                <td className="font-medium">{field.name}</td>
                                 <td>{field.type || "text"}</td>
                                 <td>{field.alternate_name || "-"}</td>
                               </tr>
@@ -230,7 +227,7 @@ function PdfUpload() {
                           {formFields.length} fillable{" "}
                           {formFields.length === 1 ? "field" : "fields"} found
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 )}
@@ -242,13 +239,14 @@ function PdfUpload() {
 
       <hr />
 
-      <div className="upload-section">
+      <div className="page-section">
         <h3>Upload New Form Template</h3>
-        <form onSubmit={handleSubmit} className="upload-form">
+        <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Form Name:</label>
+            <label htmlFor="formName">Form Name:</label>
             <input
               type="text"
+              id="formName"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
               placeholder="Enter a descriptive name for the form"
@@ -257,38 +255,39 @@ function PdfUpload() {
             />
           </div>
           <div className="form-group">
-            <label>PDF File:</label>
+            <label htmlFor="fileUpload">PDF File:</label>
             <input
               type="file"
+              id="fileUpload"
               accept=".pdf"
               onChange={handleFileChange}
               required
-              className="file-input"
+              className="form-input"
             />
-            <div className="file-requirements">
+            <p className="file-input-label mt-4">
               Only PDF files with fillable form fields are supported.
-            </div>
+            </p>
           </div>
           <button
             type="submit"
             disabled={loading || !file || !formName}
-            className="upload-button"
+            className="button"
           >
             {loading ? "Uploading..." : "Upload Form"}
           </button>
         </form>
-        {message && <p className="success-message">{message}</p>}
-        {error && <p className="error-message">{error}</p>}
+        {message && <div className="message-success">{message}</div>}
+        {error && <div className="message-error">{error}</div>}
       </div>
 
-      <div className="info-section">
-        <h3>About PDF Forms</h3>
+      <div className="page-section info-box">
+        <h4>About PDF Forms</h4>
         <p>
           Upload fillable PDF forms to use with your entities. The system will
           extract form fields that can be mapped to entity data. Once mapped,
           you can generate pre-filled PDFs for any entity.
         </p>
-        <div className="tips">
+        <div className="mt-4">
           <h4>Tips for PDF Forms</h4>
           <ul>
             <li>

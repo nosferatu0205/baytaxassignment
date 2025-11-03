@@ -114,6 +114,22 @@ def get_all_forms():
     """Gets all uploaded PDF forms (metadata only)."""
     forms = PdfForm.query.order_by(PdfForm.form_name).all()
     return jsonify([form.to_dict() for form in forms]), 200
+@api.route('/forms/<int:id>', methods=['DELETE'])
+def delete_form(id):
+    """Deletes a PDF form."""
+    form = db.session.get(PdfForm, id)
+    if not form:
+        return jsonify({'error': 'Form not found'}), 404
+        
+    try:
+        db.session.delete(form)
+        db.session.commit()
+        logger.info(f"Deleted form ID {id} ({form.form_name})")
+        return jsonify({'message': 'Form deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting form ID {id}: {e}", exc_info=True)
+        return jsonify({'error': f'Failed to delete form: {str(e)}'}), 500
 
 @api.route('/forms/<int:id>/fields', methods=['GET'])
 def get_form_fields(id):
