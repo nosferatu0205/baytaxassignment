@@ -5,12 +5,12 @@ from .models import db
 # Get the logger
 logger = logging.getLogger(__name__)
 
-# Create the app instance using the factory
+#app factory implemented
 app = create_app()
 
-# --- Main Execution ---
+# -main-
 if __name__ == '__main__':
-    # This block will run when you start the app
+    # core loop
     with app.app_context():
         # Create tables if they don't exist
         logger.info("Creating database tables (if they don't exist)...")

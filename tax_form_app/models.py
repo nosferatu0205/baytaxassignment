@@ -1,8 +1,8 @@
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
-# Initialize the SQLAlchemy extension, but don't bind it to an app yet.
-# This allows us to use it in our factory.
+
+#loosely bound SQLAlchemy schema to prevent coupling
 db = SQLAlchemy()
 
 # --- Database Models (Schema) ---
