@@ -2,3 +2,4 @@
 .env
 /BayTaxVenv
 
+tax_form_app/__pycache__
